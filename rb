@@ -1,5 +1,5 @@
 #!/bin/bash
 
-./_rb cmdgen.rb ruby bundle exec ruby $@ > .cmdsh
+_rb $CRUN_PATH/cmdgen.rb ruby bundle exec ruby $@ > .cmdsh
 
 bash .cmdsh
