@@ -20,6 +20,14 @@ if File.exist?(".#{image}.version")
   image="#{ARGV[0]}:#{File.read(".#{image}.version").chomp}"
 end
 
+ports=[]
+
+if File.exist?(".#{ARGV[0]}.ports")
+  ports += File.read(".#{ARGV[0]}.ports").split("\n").to_a
+end
+
+portstring = ports.map{|x| "-p #{x}"}.join(',')
+
 cmd2=ARGV[1]
 
 ccmd=%{#{cmd2} #{ARGV[2..-1].join(' ')}}
@@ -30,6 +38,7 @@ arr = [
   curdir,
   userspec,
   envvars,
+  portstring,
   image,
   ccmd
 ]
