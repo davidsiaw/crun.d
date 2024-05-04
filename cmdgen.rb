@@ -12,7 +12,7 @@ version="latest"
 
 puts "# version: #{ENV["VERSION"]}"
 
-if !ENV["VERSION"].nil?
+if "#{ENV["VERSION"]}".length != 0
   version=ENV["VERSION"]
 
 elsif File.exist?(".#{imagename}.version")

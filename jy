@@ -1,0 +1,5 @@
+#!/bin/bash
+
+_rb $CRUN_PATH/cmdgen.rb node yarn $@ > .cmdsh
+
+bash .cmdsh
