@@ -1,0 +1,5 @@
+#!/bin/bash
+
+_rb $CRUN_PATH/cmdgen.rb python pip install -r requirements.txt > .cmdsh
+
+bash .cmdsh
