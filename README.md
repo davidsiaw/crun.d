@@ -59,5 +59,5 @@ write the ports you want to expose. for example to expose 8080 to 80, `8080:80` 
 Environment Variables
 ---------------------
 
-- `EXPOSE` - you can override the *.ports thing above by going `EXPOSE="8080:80" rb` for example, or disable by going `EXPOSE="" rb aa`
+- `EXPOSE` - you can override the *.ports thing above by going `EXPOSE="8080:80" rb` for example, or disable by going `EXPOSE=" " rb aa`
 - `VERSION` - you can override the local *.version by going `VERSION=3.0 rb myscript.rb`

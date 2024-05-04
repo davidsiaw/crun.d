@@ -36,7 +36,7 @@ envvars = envvar_arr.map {|x| "-e #{x}" }.join(' ')
 
 ports=[]
 
-if !ENV["EXPOSE"].nil?
+if "#{ENV["EXPOSE"]}".length != 0
   ports += ENV["EXPOSE"].split(",")
 
 elsif File.exist?(".#{ARGV[0]}.ports")
