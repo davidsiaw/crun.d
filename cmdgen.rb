@@ -10,7 +10,12 @@ userspec="-u #{uid}:#{gid}"
 imagename=ARGV[0]
 version="latest"
 
-if File.exist?(".#{imagename}.version")
+puts "# version: #{ENV["VERSION"]}"
+
+if !ENV["VERSION"].nil?
+  version=ENV["VERSION"]
+
+elsif File.exist?(".#{imagename}.version")
   version="#{File.read(".#{imagename}.version").chomp}"
 end
 
