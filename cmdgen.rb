@@ -41,7 +41,38 @@ if "#{ENV["EXPOSE"]}".length != 0
 
 elsif File.exist?(".#{ARGV[0]}.ports")
   ports += File.read(".#{ARGV[0]}.ports").split("\n").to_a
+end
 
+use_gpu = false
+gpu_runtime = "nvidia"
+gpu_choice = "all"
+
+if "#{ENV["GPU_RUNTIME"]}".length != 0
+  gpu_runtime = ENV["GPU_RUNTIME"]
+  use_gpu = true
+
+elsif File.exist?(".#{ARGV[0]}.gpu_runtime")
+  gpu_runtime = File.read(".#{ARGV[0]}.gpu_runtime")
+  use_gpu = true
+
+end
+
+if "#{ENV["GPU"]}".length != 0
+  gpu_choice = ENV["GPU"]
+  use_gpu = true
+
+elsif File.exist?(".#{ARGV[0]}.gpu_choice")
+  gpu_choice = File.read(".#{ARGV[0]}.gpu_choice")
+  use_gpu = true
+
+end
+
+gpustring = ""
+
+if use_gpu
+  puts "# using gpu runtime #{gpu_runtime}"
+  puts "# using gpu #{gpu_choice}"
+  gpustring = "--runtime=#{gpu_runtime} --gpus #{gpu_choice}"
 end
 
 portstring = ports.map{|x| "-p #{x}"}.join(',')
@@ -57,6 +88,7 @@ arr = [
   userspec,
   envvars,
   portstring,
+  gpustring,
   image,
   ccmd
 ]

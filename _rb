@@ -1,3 +1,12 @@
 #!/bin/bash
 
-docker run --rm -ti -v $CRUN_PATH:$CRUN_PATH -v $PWD:$PWD --workdir=$PWD -e VERSION=$VERSION -e EXPOSE=$EXPOSE -u `id -u`:`id -g` ruby ruby "$@"
+docker run --rm -ti \
+	-u `id -u`:`id -g` \
+	-v $CRUN_PATH:$CRUN_PATH \
+	-v $PWD:$PWD \
+	--workdir=$PWD \
+	-e VERSION=$VERSION \
+	-e EXPOSE=$EXPOSE \
+	-e GPU="$GPU" \
+	-e GPU_RUNTIME="$GPU_RUNTIME" \
+	ruby ruby "$@"
