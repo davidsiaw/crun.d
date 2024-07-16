@@ -10,7 +10,6 @@ userspec="-u #{uid}:#{gid}"
 imagename=ARGV[0]
 version="latest"
 
-puts "# version: #{ENV["VERSION"]}"
 
 if "#{ENV["VERSION"]}".length != 0
   version=ENV["VERSION"]
@@ -18,6 +17,23 @@ if "#{ENV["VERSION"]}".length != 0
 elsif File.exist?(".#{imagename}.version")
   version="#{File.read(".#{imagename}.version").chomp}"
 end
+puts "# version: #{version}"
+
+if "#{ENV["NETWORK"]}".length != 0
+  network=ENV["NETWORK"]
+
+elsif File.exist?(".#{imagename}.network")
+  network="#{File.read(".#{imagename}.network").chomp}"
+end
+
+puts "# network: #{network}"
+
+networkstring = ""
+if network
+  networkstring = "--network #{network}"
+end
+
+
 
 image = "#{imagename}:#{version}"
 
@@ -54,7 +70,6 @@ if "#{ENV["GPU_RUNTIME"]}".length != 0
 elsif File.exist?(".#{ARGV[0]}.gpu_runtime")
   gpu_runtime = File.read(".#{ARGV[0]}.gpu_runtime")
   use_gpu = true
-
 end
 
 if "#{ENV["GPU"]}".length != 0
@@ -89,6 +104,7 @@ arr = [
   envvars,
   portstring,
   gpustring,
+  networkstring,
   image,
   ccmd
 ]

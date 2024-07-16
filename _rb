@@ -9,4 +9,5 @@ docker run --rm -ti \
 	-e EXPOSE=$EXPOSE \
 	-e GPU="$GPU" \
 	-e GPU_RUNTIME="$GPU_RUNTIME" \
+	-e NETWORK="$NETWORK" \
 	ruby ruby "$@"
