@@ -11,4 +11,6 @@ docker run --rm -ti \
 	-e GPU_RUNTIME="$GPU_RUNTIME" \
 	-e NETWORK="$NETWORK" \
 	-e CLEANNAME="$CLEANNAME" \
+	-e GIT_DIR="$PWD" \
+	-e USR=`id -un` \
 	ruby ruby "$@"

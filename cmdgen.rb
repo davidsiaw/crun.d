@@ -1,6 +1,7 @@
 pwd=`echo $PWD`.chomp
 uid=`id -u`.chomp
 gid=`id -g`.chomp
+username=`echo $USR`.chomp
 
 basecmd="docker run"
 flags="--rm -ti"
@@ -8,7 +9,7 @@ curdir=%{-v #{pwd}:#{pwd} --workdir=#{pwd}}
 userspec="-u #{uid}:#{gid}"
 
 imagename=ARGV[0]
-cleanname=ENV["CLEANNAME"] || imagename
+cleanname= "#{ENV["CLEANNAME"]}".length.zero? ? imagename : ENV["CLEANNAME"]
 
 if "#{ENV["VERSION"]}".length != 0
   version=ENV["VERSION"]
@@ -36,6 +37,7 @@ if network
 end
 
 image = "#{imagename}:#{version}"
+hostnamespec = "--hostname #{image.gsub(/[^A-Za-z0-9]+/, '-')}"
 
 envvar_arr=[
   %{XDG_CACHE_HOME="#{pwd}/.cache/#{cleanname}.#{version}"},
@@ -99,6 +101,7 @@ ccmd=%{#{cmd2} #{ARGV[2..-1]&.join(' ')}}
 arr = [
   basecmd,
   flags,
+  hostnamespec,
   curdir,
   userspec,
   envvars,
