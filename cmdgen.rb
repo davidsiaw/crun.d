@@ -8,22 +8,24 @@ curdir=%{-v #{pwd}:#{pwd} --workdir=#{pwd}}
 userspec="-u #{uid}:#{gid}"
 
 imagename=ARGV[0]
-version="latest"
-
+cleanname=ENV["CLEANNAME"] || imagename
 
 if "#{ENV["VERSION"]}".length != 0
   version=ENV["VERSION"]
 
-elsif File.exist?(".#{imagename}.version")
-  version="#{File.read(".#{imagename}.version").chomp}"
+elsif File.exist?(".#{cleanname}.version")
+  version="#{File.read(".#{cleanname}.version").chomp}"
+
+elsif File.exist?(".#{cleanname}-version")
+  version="#{File.read(".#{cleanname}-version").chomp}"
 end
 puts "# version: #{version}"
 
 if "#{ENV["NETWORK"]}".length != 0
   network=ENV["NETWORK"]
 
-elsif File.exist?(".#{imagename}.network")
-  network="#{File.read(".#{imagename}.network").chomp}"
+elsif File.exist?(".#{cleanname}.network")
+  network="#{File.read(".#{cleanname}.network").chomp}"
 end
 
 puts "# network: #{network}"
@@ -33,16 +35,14 @@ if network
   networkstring = "--network #{network}"
 end
 
-
-
 image = "#{imagename}:#{version}"
 
 envvar_arr=[
-  %{XDG_CACHE_HOME="#{pwd}/.cache/#{imagename}.#{version}"},
-  %{XDG_DATA_HOME="#{pwd}/.data/#{imagename}.#{version}"},
-  %{XDG_STATE_HOME="#{pwd}/.state/#{imagename}.#{version}"},
-  %{XDG_RUNTIME_DIR_HOME="#{pwd}/.runtime/#{imagename}.#{version}"},
-  %{PYTHONUSERBASE="#{pwd}/.pip/#{imagename}.#{version}"},
+  %{XDG_CACHE_HOME="#{pwd}/.cache/#{cleanname}.#{version}"},
+  %{XDG_DATA_HOME="#{pwd}/.data/#{cleanname}.#{version}"},
+  %{XDG_STATE_HOME="#{pwd}/.state/#{cleanname}.#{version}"},
+  %{XDG_RUNTIME_DIR_HOME="#{pwd}/.runtime/#{cleanname}.#{version}"},
+  %{PYTHONUSERBASE="#{pwd}/.pip/#{cleanname}.#{version}"},
   %{BUNDLE_PATH="#{pwd}/.bundler"},
   'BUNDLE_DISABLE_SHARED_GEMS=true',
   "HOME=#{pwd}"
@@ -94,7 +94,7 @@ portstring = ports.map{|x| "-p #{x}"}.join(',')
 
 cmd2=ARGV[1]
 
-ccmd=%{#{cmd2} #{ARGV[2..-1].join(' ')}}
+ccmd=%{#{cmd2} #{ARGV[2..-1]&.join(' ')}}
 
 arr = [
   basecmd,

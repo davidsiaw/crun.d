@@ -10,4 +10,5 @@ docker run --rm -ti \
 	-e GPU="$GPU" \
 	-e GPU_RUNTIME="$GPU_RUNTIME" \
 	-e NETWORK="$NETWORK" \
+	-e CLEANNAME="$CLEANNAME" \
 	ruby ruby "$@"
