@@ -11,6 +11,7 @@ userspec="-u #{uid}:#{gid}"
 imagename=ARGV[0]
 cleanname= "#{ENV["CLEANNAME"]}".length.zero? ? imagename : ENV["CLEANNAME"]
 
+version = "latest"
 if "#{ENV["VERSION"]}".length != 0
   version=ENV["VERSION"]
 
@@ -19,6 +20,7 @@ elsif File.exist?(".#{cleanname}.version")
 
 elsif File.exist?(".#{cleanname}-version")
   version="#{File.read(".#{cleanname}-version").chomp}"
+
 end
 puts "# version: #{version}"
 
@@ -49,6 +51,26 @@ envvar_arr=[
   'BUNDLE_DISABLE_SHARED_GEMS=true',
   "HOME=#{pwd}"
 ]
+
+if File.exist?(".#{cleanname}.env")
+  lines = File.read(".#{cleanname}.env").split("\n")
+  envvar_arr += lines
+end
+
+if File.exist?(".#{cleanname}.openv")
+  lines = File.read(".#{cleanname}.openv").split("\n")
+  lines.each do |line|
+    t1 = line.split('=')
+    envname = t1[0]
+    t2 = t1[1].split(':')
+    id = t2[0]
+    field = t2[1]
+
+    stuff = %Q{`op item get --reveal "#{id}" --fields label="#{field}"`}
+
+    envvar_arr << %Q{#{envname}="#{stuff}"}
+  end
+end
 
 envvars = envvar_arr.map {|x| "-e #{x}" }.join(' ')
 
