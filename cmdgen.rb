@@ -3,6 +3,11 @@ uid=`id -u`.chomp
 gid=`id -g`.chomp
 username=`echo $USR`.chomp
 
+# prevent return carriages from affecting the command line
+def puts(str)
+  print "#{str} #\n"
+end
+
 basecmd="docker run"
 flags="--rm -ti"
 curdir=%{-v #{pwd}:#{pwd} --workdir=#{pwd}}
@@ -20,9 +25,34 @@ elsif File.exist?(".#{cleanname}.version")
 
 elsif File.exist?(".#{cleanname}-version")
   version="#{File.read(".#{cleanname}-version").chomp}"
-
 end
+
+
 puts "# version: #{version}"
+
+if File.exist?(".#{cleanname}.prepare")
+  slug = `pwd`.chomp.gsub(/[^a-zA-Z0-9]+/, '-')
+  oldversion = version
+  version = "#{version}-prepared-#{slug}"
+
+  puts "# prepare: #{version}"
+
+  File.write(".prebuild-dockerfile", <<~CONTENT)
+    FROM #{cleanname}:#{oldversion}
+
+    COPY .#{cleanname}.prepare /prebuild.bash
+
+    RUN chmod +x /prebuild.bash && /prebuild.bash
+  CONTENT
+
+  params = ""
+
+  if ENV["NOCACHE"] == '1'
+    params += "--no-cache"
+  end
+
+  puts "docker build . #{params} --progress=plain -f .prebuild-dockerfile -t #{cleanname}:#{version} &> .docker-build.log"
+end
 
 if "#{ENV["NETWORK"]}".length != 0
   network=ENV["NETWORK"]

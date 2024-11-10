@@ -13,4 +13,5 @@ docker run --rm -ti \
 	-e CLEANNAME="$CLEANNAME" \
 	-e GIT_DIR="$PWD" \
 	-e USR=`id -un` \
+	-e NOCACHE="$NOCACHE" \
 	ruby ruby "$@"
