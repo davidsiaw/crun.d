@@ -10,6 +10,7 @@ docker run --rm -ti \
 	-e GPU="$GPU" \
 	-e GPU_RUNTIME="$GPU_RUNTIME" \
 	-e NETWORK="$NETWORK" \
+	-e NAME="$NAME" \
 	-e CLEANNAME="$CLEANNAME" \
 	-e GIT_DIR="$PWD" \
 	-e USR=`id -un` \

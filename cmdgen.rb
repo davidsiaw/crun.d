@@ -65,11 +65,22 @@ puts "# network: #{network}"
 
 networkstring = ""
 if network
-  networkstring = "--network #{network}"
+  networkstring = "--net #{network}"
 end
 
 image = "#{imagename}:#{version}"
-hostnamespec = "--hostname #{image.gsub(/[^A-Za-z0-9]+/, '-')}"
+hostname = image.gsub(/[^A-Za-z0-9]+/, '-')
+hostnamespec = "--hostname #{hostname}"
+
+cname = hostname
+if "#{ENV["NAME"]}".length != 0
+  cname=ENV["NAME"]
+
+elsif File.exist?(".#{cleanname}.name")
+  cname="#{File.read(".#{cleanname}.name").chomp}"
+end
+
+namespec = "--name #{cname}"
 
 envvar_arr=[
   %{XDG_CACHE_HOME="#{pwd}/.cache/#{cleanname}.#{version}"},
@@ -154,6 +165,7 @@ arr = [
   basecmd,
   flags,
   hostnamespec,
+  namespec,
   curdir,
   userspec,
   envvars,
