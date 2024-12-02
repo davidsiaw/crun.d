@@ -29,6 +29,10 @@ Commands
 - `js myscript.js` run a script
 - `je node -v` run something where node exists
 
+### rust
+- `rs` run something where rust exists
+- `rc` run cargo
+
 Customize
 ---------
 

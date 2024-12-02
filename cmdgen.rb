@@ -89,6 +89,7 @@ envvar_arr=[
   %{XDG_RUNTIME_DIR_HOME="#{pwd}/.runtime/#{cleanname}.#{version}"},
   %{PYTHONUSERBASE="#{pwd}/.pip/#{cleanname}.#{version}"},
   %{BUNDLE_PATH="#{pwd}/.bundler"},
+  %{CARGO_INSTALL_ROOT="#{pwd}/.cargo/#{cleanname}.#{version}"},
   'BUNDLE_DISABLE_SHARED_GEMS=true',
   "HOME=#{pwd}"
 ]
