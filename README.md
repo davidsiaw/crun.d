@@ -53,6 +53,10 @@ network simply go `host` or use whichever network you have created.
 
 sometimes you need to apt get something for your script to work. in this case you can write a .ruby.prepare like this:
 
+### .ruby.x11.json
+
+sometimes you need access to X11 for UI purposes. Use this to connect. you need to fill it with at least `{}` for it to work.
+
 ```
 #! /bin/bash
 

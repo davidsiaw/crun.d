@@ -1,3 +1,5 @@
+require 'json'
+
 pwd=`echo $PWD`.chomp
 uid=`id -u`.chomp
 gid=`id -g`.chomp
@@ -158,6 +160,20 @@ end
 
 portstring = ports.map{|x| "-p #{x}"}.join(',')
 
+
+x11string = ""
+
+x11config = ".#{cleanname}.x11.json"
+if File.exist?(x11config)
+  begin
+    data = JSON.parse(File.read(x11config))
+    x11string = "-v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY"
+  rescue => e
+    puts %Q{echo "WARNING: failed to read #{x11config}", "#{e}" \n}
+  end
+end
+
+
 cmd2=ARGV[1]
 
 ccmd=%{#{cmd2} #{ARGV[2..-1]&.join(' ')}}
@@ -173,6 +189,7 @@ arr = [
   portstring,
   gpustring,
   networkstring,
+  x11string,
   image,
   ccmd
 ]
