@@ -39,7 +39,7 @@ if File.exist?(".#{cleanname}.prepare")
 
   puts "# prepare: #{version}"
 
-  File.write(".prebuild-dockerfile", <<~CONTENT)
+  content = <<~CONTENT
     FROM #{cleanname}:#{oldversion}
 
     COPY .#{cleanname}.prepare /prebuild.bash
@@ -53,7 +53,45 @@ if File.exist?(".#{cleanname}.prepare")
     params += "--no-cache"
   end
 
-  puts "docker build . #{params} --progress=plain -f .prebuild-dockerfile -t #{cleanname}:#{version} &> .docker-build.log"
+
+
+  if File.exist?(".#{cleanname}.prestart")
+    copies = ""
+
+    lines = File.read(".#{cleanname}.prestart").split("\n")
+    lines.each do |x|
+      if x.start_with?('#need')
+        fname = x[6..-1]
+        copies += "COPY #{fname} #{pwd}/#{fname} \n"
+      end
+    end
+
+    content +=  <<~CONTENT
+      COPY .#{cleanname}.prestart /prestart.bash
+
+      RUN chmod +x /prestart.bash
+
+      RUN mkdir -p #{pwd}
+      RUN useradd #{username} -u #{uid} -g #{gid} -m -s /bin/bash 
+
+      #{copies}
+      RUN chown -R #{username} #{pwd}
+
+      WORKDIR #{pwd}
+      RUN ls
+      RUN bash /prestart.bash
+
+    CONTENT
+  end
+
+  File.write(".prebuild-dockerfile", content)
+
+  imgname = "#{cleanname}:#{version}"
+
+  #puts "docker rmi #{imgname}"
+
+
+  puts "docker build . #{params} --progress=plain -f .prebuild-dockerfile -t #{imgname} &> .docker-build.log"
 end
 
 if "#{ENV["NETWORK"]}".length != 0
@@ -74,15 +112,19 @@ image = "#{imagename}:#{version}"
 hostname = image.gsub(/[^A-Za-z0-9]+/, '-')
 hostnamespec = "--hostname #{hostname}"
 
+named = false
 cname = hostname
 if "#{ENV["NAME"]}".length != 0
   cname=ENV["NAME"]
+  named=true
 
 elsif File.exist?(".#{cleanname}.name")
   cname="#{File.read(".#{cleanname}.name").chomp}"
+  named=true
 end
 
-namespec = "--name #{cname}"
+namespec = " "
+namespec = "--name #{cname} " if named
 
 envvar_arr=[
   %{XDG_CACHE_HOME="#{pwd}/.cache/#{cleanname}.#{version}"},

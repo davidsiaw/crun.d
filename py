@@ -1,5 +1,9 @@
 #!/bin/bash
 
-_rb $CRUN_PATH/cmdgen.rb python python $@ > .cmdsh
+a=`uuidgen | tr -d '-'`
 
-bash .cmdsh
+_rb $CRUN_PATH/cmdgen.rb python python $@ > .cmdsh$a
+
+bash .cmdsh$a
+
+rm .cmdsh$a
