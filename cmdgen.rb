@@ -15,6 +15,10 @@ flags="--rm -ti"
 curdir=%{-v #{pwd}:#{pwd} --workdir=#{pwd}}
 userspec="-u #{uid}:#{gid}"
 
+if "#{ENV["NOUSERDEF"]}" == '1'
+  userspec = ''
+end
+
 imagename=ARGV[0]
 cleanname= "#{ENV["CLEANNAME"]}".length.zero? ? imagename : ENV["CLEANNAME"]
 
