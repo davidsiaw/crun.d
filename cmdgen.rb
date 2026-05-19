@@ -1,4 +1,5 @@
 require 'json'
+require 'yaml'
 
 pwd=`echo $PWD`.chomp
 uid=`id -u`.chomp
@@ -161,6 +162,35 @@ if File.exist?(".#{cleanname}.openv")
     envvar_arr << %Q{#{envname}="#{stuff}"}
   end
 end
+
+
+# easier to edit op env file
+op_env_yml = ".#{cleanname}.openv.yml"
+if File.exist?(op_env_yml)
+  data = YAML.load_file(op_env_yml, aliases: true)
+
+  if !data.is_a?(Hash)
+    $stderr.puts "in #{op_env_yml}, it needs to be a hash."
+    exit(1)
+  end
+
+  data.each do |envname, info|
+    # we do not support env vars that are not all caps
+    next if envname.upcase != envname
+
+    opcmd = %Q{op item get --reveal "#{info['item']}" --fields label="#{info['key']}"}
+
+    if info['vault']
+      opcmd += %Q{ --vault "#{info['vault']}"}
+    end
+
+    sekret = %Q{`#{opcmd}`}
+
+    envvar_arr << %Q{#{envname}="#{sekret}"}
+  end
+
+end
+
 
 envvars = envvar_arr.map {|x| "-e #{x}" }.join(' ')
 

@@ -65,6 +65,34 @@ if you realize you are using a stale image, you can force recreation by going `N
 
 sometimes you need access to X11 for UI purposes. Use this to connect. you need to fill it with at least `{}` for it to work.
 
+### .ruby.env
+
+sometimes you need to pass environment variables to your application. This can be done by creating the above file and writing in this format:
+
+```
+MY_ENV_VAR=abcd
+```
+
+### .ruby.openv.yml
+
+sometimes the environment variable you wish to pass is secret. crun supports the use of 1password for this. Here is an example `*.openv.yml`. You will need to install and activate the 1password CLI to enable this.
+
+Only CAPS_CASE keys are read as keys. others are ignored and can be used as aliases.
+
+```
+---
+awesome_team_vault: &awesome_team_vault
+  vault: abcd1234efgh5678uuid
+
+VERY_SECRET_VARIABLE:
+  <<: *awesome_team_vault
+  item: top-secret-app-credentials
+  key: highly-confidential-password
+```
+
+The `vault` key is optional but we recommend using it so you have no ambiguity. Tip here is to just encode the vault UUID, so you can have super-readable vault names. `item` key can also be a UUID too!
+
+
 ### How about python and node?
 
 the above things are available for python and node too! Just go .python.ports or .node.network
