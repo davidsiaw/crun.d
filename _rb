@@ -1,6 +1,9 @@
 #!/bin/bash
 
-docker run --rm -ti \
+TTY_FLAGS="-i"
+[ -t 0 ] && [ -t 1 ] && TTY_FLAGS="-it"
+
+docker run --rm $TTY_FLAGS \
 	-u `id -u`:`id -g` \
 	-v $CRUN_PATH:$CRUN_PATH \
 	-v $PWD:$PWD \
