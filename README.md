@@ -33,6 +33,23 @@ Commands
 - `rz` run something where rust exists
 - `rc` run cargo
 
+### pi agent
+- `pa` run the pi coding agent in a throwaway sandbox container
+
+`pa` is different from the others: it runs the prebuilt `davidsiaw/pi-sandbox`
+image (pulled from Docker Hub, built separately) rather than a stock language
+image. It mounts the current directory at its real path and drops you into pi.
+Anything the agent installs (gems, npm, pip, extra language runtimes) stays in
+the container and vanishes on exit; your project edits and any skills/extensions
+the agent writes persist on the host. Runtimes are managed by mise and cached in
+a docker volume so you only compile ruby/python once.
+
+```
+cd ~/some/project && pa
+```
+
+Full docs live with the image at `~/work/picon/docs`.
+
 Customize
 ---------
 
@@ -97,9 +114,36 @@ The `vault` key is optional but we recommend using it so you have no ambiguity. 
 
 the above things are available for python and node too! Just go .python.ports or .node.network
 
+### pa config
+
+`pa` reads its config from `~/.pi/agent` (your global pi home), not from local
+`.pa.*` files, because the sandbox is about pi itself rather than a per-project
+language runtime.
+
+What it mounts if present: your `skills/` and `extensions/` (read-write, so the
+agent's work is saved), `settings.json` / `models.json` / `trust.json` (read
+only), `auth.json` (read only, so pi can reach a model), and any prompt/context
+files (`AGENTS.md`, `CLAUDE.md`, `SYSTEM.md`, `APPEND_SYSTEM.md`).
+
+Secrets/env vars are forwarded, not mounted, from two sources (later wins):
+
+- `~/.pi/agent/pa.env` - plain `KEY=value` lines, e.g. `MY_ENV_VAR=some-value`
+- `~/.pi/agent/pa.openv` - live 1password lookups, one per line, same idea as
+  crun's `.openv` but line-format: `ENVNAME=item:field` or
+  `ENVNAME=item:field:vault`. Needs the `op` CLI signed in; the secret is
+  pulled at launch and never written to disk.
+
 Environment Variables
 ---------------------
 
 - `EXPOSE` - you can override the *.ports thing above by going `EXPOSE="8080:80" rb` for example, or disable by going `EXPOSE=" " rb aa`
 - `VERSION` - you can override the local *.version by going `VERSION=3.0 rb myscript.rb`
 - `NETWORK` - you can override the local *.network by going `NETWORK=host rb myscript.rb`
+
+### pa toggles
+
+- `PA_IMAGE` - override the image (default `davidsiaw/pi-sandbox:latest`)
+- `MOUNT_AUTH=0` - don't mount `auth.json`; keep credentials out of the sandbox
+- `NO_MOUNT_SYSTEM=1` - don't mount a host `SYSTEM.md` (which would replace pi's
+  system prompt)
+- `MISE_VOLUME` - name of the runtime cache volume (default `pi-sandbox-mise`)

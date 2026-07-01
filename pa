@@ -1,0 +1,80 @@
+#!/bin/bash
+set -euo pipefail
+
+IMAGE="${PA_IMAGE:-davidsiaw/pi-sandbox:latest}"
+MISE_VOLUME="${MISE_VOLUME:-pi-sandbox-mise}"
+PI_HOME="$HOME/.pi"
+
+docker volume inspect "$MISE_VOLUME" >/dev/null 2>&1 || docker volume create "$MISE_VOLUME" >/dev/null
+
+mkdir -p "$PI_HOME/agent/skills" "$PI_HOME/agent/extensions"
+
+TTY_FLAGS="-i"
+[ -t 0 ] && [ -t 1 ] && TTY_FLAGS="-it"
+
+mounts=(
+  -v "$PWD:$PWD"
+  --workdir="$PWD"
+  -v "$MISE_VOLUME:/home/agent/.local/share/mise"
+  -v "$PI_HOME/agent/skills:/home/agent/.pi/agent/skills"
+  -v "$PI_HOME/agent/extensions:/home/agent/.pi/agent/extensions"
+)
+
+for jf in settings.json models.json trust.json; do
+  if [ -f "$PI_HOME/agent/$jf" ]; then
+    mounts+=(-v "$PI_HOME/agent/$jf:/home/agent/.pi/agent/$jf:ro")
+  fi
+done
+
+if [ "${MOUNT_AUTH:-1}" != "0" ] && [ -f "$PI_HOME/agent/auth.json" ]; then
+  mounts+=(-v "$PI_HOME/agent/auth.json:/home/agent/.pi/agent/auth.json:ro")
+fi
+
+for cf in AGENTS.md CLAUDE.md; do
+  if [ -f "$PI_HOME/agent/$cf" ]; then
+    mounts+=(-v "$PI_HOME/agent/$cf:/home/agent/.pi/agent/$cf:ro")
+  fi
+done
+
+if [ "${NO_MOUNT_SYSTEM:-0}" != "1" ] && [ -f "$PI_HOME/agent/SYSTEM.md" ]; then
+  mounts+=(-v "$PI_HOME/agent/SYSTEM.md:/home/agent/.pi/agent/SYSTEM.md:ro")
+fi
+
+if [ -f "$PI_HOME/agent/APPEND_SYSTEM.md" ]; then
+  mounts+=(-v "$PI_HOME/agent/APPEND_SYSTEM.md:/opt/pa/APPEND_SYSTEM.host.md:ro")
+fi
+
+env_args=()
+
+if [ -f "$PI_HOME/agent/pa.env" ]; then
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    env_args+=(-e "$line")
+  done < "$PI_HOME/agent/pa.env"
+fi
+
+if [ -f "$PI_HOME/agent/pa.openv" ] && command -v op >/dev/null 2>&1; then
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    name="${line%%=*}"
+    spec="${line#*=}"
+    item="${spec%%:*}"; rest="${spec#*:}"
+    field="${rest%%:*}"; vault=""
+    [ "$rest" != "$field" ] && vault="${rest#*:}"
+    op_cmd=(op item get --reveal "$item" --fields "label=$field")
+    [ -n "$vault" ] && op_cmd+=(--vault "$vault")
+    if value="$("${op_cmd[@]}" 2>/dev/null)"; then
+      env_args+=(-e "$name=$value")
+    else
+      echo "pa: warning: could not resolve $name from 1Password ($item)" >&2
+    fi
+  done < "$PI_HOME/agent/pa.openv"
+fi
+
+exec docker run --rm $TTY_FLAGS \
+  --user "$(id -u):$(id -g)" \
+  --hostname pi-agent \
+  "${mounts[@]}" \
+  ${env_args[@]+"${env_args[@]}"} \
+  "$IMAGE" \
+  bash -lc 'exec pi "$@"' -- "$@"
