@@ -20,11 +20,15 @@ mounts=(
   -v "$PI_HOME/agent/extensions:/home/agent/.pi/agent/extensions"
 )
 
-for jf in settings.json models.json trust.json; do
+for jf in models.json trust.json; do
   if [ -f "$PI_HOME/agent/$jf" ]; then
     mounts+=(-v "$PI_HOME/agent/$jf:/home/agent/.pi/agent/$jf:ro")
   fi
 done
+
+if [ -f "$PI_HOME/agent/settings.json" ]; then
+  mounts+=(-v "$PI_HOME/agent/settings.json:/opt/pa/settings.host.json:ro")
+fi
 
 if [ "${MOUNT_AUTH:-1}" != "0" ] && [ -f "$PI_HOME/agent/auth.json" ]; then
   mounts+=(-v "$PI_HOME/agent/auth.json:/home/agent/.pi/agent/auth.json:ro")
@@ -71,10 +75,17 @@ if [ -f "$PI_HOME/agent/pa.openv" ] && command -v op >/dev/null 2>&1; then
   done < "$PI_HOME/agent/pa.openv"
 fi
 
-exec docker run --rm $TTY_FLAGS \
+exec docker run --pull=always --rm $TTY_FLAGS \
   --user "$(id -u):$(id -g)" \
   --hostname pi-agent \
   "${mounts[@]}" \
   ${env_args[@]+"${env_args[@]}"} \
   "$IMAGE" \
-  bash -lc 'exec pi "$@"' -- "$@"
+  bash -lc '
+    pi_args=()
+    [ -d /opt/pa/skills ] && pi_args+=(--skill /opt/pa/skills)
+    for ext in /opt/pa/extensions/*/; do
+      [ -f "${ext}index.ts" ] && pi_args+=(-e "${ext%/}")
+    done
+    exec pi "${pi_args[@]}" "$@"
+  ' -- "$@"

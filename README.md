@@ -125,6 +125,9 @@ agent's work is saved), `settings.json` / `models.json` / `trust.json` (read
 only), `auth.json` (read only, so pi can reach a model), and any prompt/context
 files (`AGENTS.md`, `CLAUDE.md`, `SYSTEM.md`, `APPEND_SYSTEM.md`).
 
+The image can also ship its own skills and extensions (baked at `/opt/pa`),
+loaded on top of your host ones. Those live in the image repo, not here.
+
 Secrets/env vars are forwarded, not mounted, from two sources (later wins):
 
 - `~/.pi/agent/pa.env` - plain `KEY=value` lines, e.g. `MY_ENV_VAR=some-value`
