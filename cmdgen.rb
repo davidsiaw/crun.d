@@ -97,7 +97,7 @@ if File.exist?(".#{cleanname}.prepare")
   #puts "docker rmi #{imgname}"
 
 
-  puts "docker build . #{params} --progress=plain -f .prebuild-dockerfile -t #{imgname} &> .docker-build.log"
+  puts "docker build . #{params} --progress=plain -f .prebuild-dockerfile -t #{imgname} &> .docker-build.log\n"
 end
 
 if "#{ENV["NETWORK"]}".length != 0
@@ -115,6 +115,7 @@ if network
 end
 
 image = "#{imagename}:#{version}"
+
 hostname = image.gsub(/[^A-Za-z0-9]+/, '-')
 hostnamespec = "--hostname #{hostname}"
 
@@ -212,8 +213,8 @@ if "#{ENV["GPU_RUNTIME"]}".length != 0
   gpu_runtime = ENV["GPU_RUNTIME"]
   use_gpu = true
 
-elsif File.exist?(".#{ARGV[0]}.gpu_runtime")
-  gpu_runtime = File.read(".#{ARGV[0]}.gpu_runtime")
+elsif File.exist?(".#{cleanname}.gpu_runtime")
+  gpu_runtime = File.read(".#{cleanname}.gpu_runtime")
   use_gpu = true
 end
 
@@ -221,8 +222,8 @@ if "#{ENV["GPU"]}".length != 0
   gpu_choice = ENV["GPU"]
   use_gpu = true
 
-elsif File.exist?(".#{ARGV[0]}.gpu_choice")
-  gpu_choice = File.read(".#{ARGV[0]}.gpu_choice")
+elsif File.exist?(".#{cleanname}.gpu_choice")
+  gpu_choice = File.read(".#{cleanname}.gpu_choice")
   use_gpu = true
 
 end
