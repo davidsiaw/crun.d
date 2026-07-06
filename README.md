@@ -128,6 +128,10 @@ files (`AGENTS.md`, `CLAUDE.md`, `SYSTEM.md`, `APPEND_SYSTEM.md`).
 The image can also ship its own skills and extensions (baked at `/opt/pa`),
 loaded on top of your host ones. Those live in the image repo, not here.
 
+pi sessions are written to a `.pi-sessions/` folder inside the current project
+(created by `pa`, passed via `--session-dir`), so they persist on the host and
+stay with the project rather than in the throwaway container home.
+
 Secrets/env vars are forwarded, not mounted, from two sources (later wins):
 
 - `~/.pi/agent/pa.env` - plain `KEY=value` lines, e.g. `MY_ENV_VAR=some-value`

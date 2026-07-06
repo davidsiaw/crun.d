@@ -8,6 +8,7 @@ PI_HOME="$HOME/.pi"
 docker volume inspect "$MISE_VOLUME" >/dev/null 2>&1 || docker volume create "$MISE_VOLUME" >/dev/null
 
 mkdir -p "$PI_HOME/agent/skills" "$PI_HOME/agent/extensions"
+mkdir -p "$PWD/.pi-sessions"
 
 TTY_FLAGS="-i"
 [ -t 0 ] && [ -t 1 ] && TTY_FLAGS="-it"
@@ -82,7 +83,7 @@ exec docker run --pull=always --rm $TTY_FLAGS \
   ${env_args[@]+"${env_args[@]}"} \
   "$IMAGE" \
   bash -lc '
-    pi_args=()
+    pi_args=(--session-dir "$PWD/.pi-sessions")
     [ -d /opt/pa/skills ] && pi_args+=(--skill /opt/pa/skills)
     for ext in /opt/pa/extensions/*/; do
       [ -f "${ext}index.ts" ] && pi_args+=(-e "${ext%/}")
