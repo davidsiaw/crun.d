@@ -21,11 +21,14 @@ mounts=(
   -v "$PI_HOME/agent/extensions:/home/agent/.pi/agent/extensions"
 )
 
-for jf in models.json trust.json; do
-  if [ -f "$PI_HOME/agent/$jf" ]; then
-    mounts+=(-v "$PI_HOME/agent/$jf:/home/agent/.pi/agent/$jf:ro")
-  fi
-done
+if [ -f "$PI_HOME/agent/models.json" ]; then
+  mounts+=(-v "$PI_HOME/agent/models.json:/home/agent/.pi/agent/models.json:ro")
+fi
+
+# NOTE: trust.json is deliberately NOT mounted. pi persists project-trust by
+# WRITING it; a read-only host mount makes "Trust" fail with EROFS. Instead the
+# entrypoint's seed-trust.sh generates a writable trust.json that trusts the
+# project dir (mounted at its real host path). The host trust.json is untouched.
 
 if [ -f "$PI_HOME/agent/settings.json" ]; then
   mounts+=(-v "$PI_HOME/agent/settings.json:/opt/pa/settings.host.json:ro")
@@ -76,14 +79,27 @@ if [ -f "$PI_HOME/agent/pa.openv" ] && command -v op >/dev/null 2>&1; then
   done < "$PI_HOME/agent/pa.openv"
 fi
 
+# Tailscale MagicDNS resolver — lets the container resolve tailnet hostnames
+# (e.g. my-mac.tail12345.ts.net) so local models on 127.0.0.1 are reachable.
+# Only applies when Tailscale is running; harmless otherwise.
+dns_args=()
+if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
+  dns_args=(--dns 100.100.100.100)
+fi
+
 exec docker run --pull=always --rm $TTY_FLAGS \
   --user "$(id -u):$(id -g)" \
   --hostname pi-agent \
   "${mounts[@]}" \
+  ${dns_args[@]+"${dns_args[@]}"} \
   ${env_args[@]+"${env_args[@]}"} \
   "$IMAGE" \
   bash -lc '
     pi_args=(--session-dir "$PWD/.pi-sessions")
+    # Auto-trust the project dir: pa is always launched deliberately in the cwd
+    # you want to work in, and the container is disposable, so the interactive
+    # trust prompt is pure friction. Opt out by passing --no-approve after "pa".
+    pi_args+=(--approve)
     [ -d /opt/pa/skills ] && pi_args+=(--skill /opt/pa/skills)
     for ext in /opt/pa/extensions/*/; do
       [ -f "${ext}index.ts" ] && pi_args+=(-e "${ext%/}")
