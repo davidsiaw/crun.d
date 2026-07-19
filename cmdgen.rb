@@ -12,7 +12,7 @@ def puts(str)
 end
 
 basecmd="docker run"
-tty_flag = ($stdin.tty? && $stdout.tty?) ? "-it" : "-i"
+tty_flag = "-i"  # always pass stdin through
 flags = "--rm #{tty_flag}"
 curdir=%{-v #{pwd}:#{pwd} --workdir=#{pwd}}
 userspec="-u #{uid}:#{gid}"

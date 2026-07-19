@@ -1,0 +1,17 @@
+#!/bin/bash
+# _run <image> <command> [args...]
+# Handles stdin: if piped, saves to temp file before _rb eats it
+
+a=`uuidgen | tr -d '-'`
+
+if [ -t 0 ]; then
+  _rb $CRUN_PATH/cmdgen.rb "$@" > .cmdsh$a
+  bash .cmdsh$a
+else
+  TMPSTDIN=$(mktemp)
+  cat > "$TMPSTDIN"
+  _rb $CRUN_PATH/cmdgen.rb "$@" > .cmdsh$a
+  bash .cmdsh$a < "$TMPSTDIN"
+  rm "$TMPSTDIN"
+fi
+rm .cmdsh$a

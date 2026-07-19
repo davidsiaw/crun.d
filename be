@@ -1,9 +1,2 @@
 #!/bin/bash
-
-a=`uuidgen | tr -d '-'`
-
-_rb $CRUN_PATH/cmdgen.rb ruby bundle exec $@ > .cmdsh$a
-
-bash .cmdsh$a
-
-rm .cmdsh$a
+exec _run ruby bundle exec "$@"
