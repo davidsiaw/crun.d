@@ -21,6 +21,9 @@ mounts=(
   -v "$PI_HOME/agent/extensions:/home/agent/.pi/agent/extensions"
 )
 
+mkdir -p "$PI_HOME/agent/auth2api"
+mounts+=(-v "$PI_HOME/agent/auth2api:/home/agent/.pi/agent/auth2api")
+
 if [ -f "$PI_HOME/agent/models.json" ]; then
   mounts+=(-v "$PI_HOME/agent/models.json:/home/agent/.pi/agent/models.json:ro")
 fi
@@ -35,7 +38,7 @@ if [ -f "$PI_HOME/agent/settings.json" ]; then
 fi
 
 if [ "${MOUNT_AUTH:-1}" != "0" ] && [ -f "$PI_HOME/agent/auth.json" ]; then
-  mounts+=(-v "$PI_HOME/agent/auth.json:/home/agent/.pi/agent/auth.json:ro")
+  mounts+=(-v "$PI_HOME/agent/auth.json:/home/agent/.pi/agent/auth.json")
 fi
 
 for cf in AGENTS.md CLAUDE.md; do
