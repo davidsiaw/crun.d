@@ -90,20 +90,54 @@ if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; the
   dns_args=(--dns 100.100.100.100)
 fi
 
+# Spice — lets the agent run heighliner even though this container has no docker
+# socket. Only wires up when a spice server is actually running; otherwise pa
+# behaves exactly as it did before.
+net_args=()
+SPICE_NAME="${SPICE_NAME:-heighliner-spice}"
+SPICE_NETWORK="${SPICE_NETWORK:-heighliner_net}"
+SPICE_PORT="${SPICE_PORT:-7529}"
+SPICE_STREAM_PORT="${SPICE_STREAM_PORT:-7530}"
+SPICE_CLIENT_VOLUME="${SPICE_CLIENT_VOLUME:-spice-client}"
+SPICE_TOKEN_FILE="${SPICE_TOKEN_FILE:-$HOME/.local/share/spice/token}"
+
+if [ "$(docker inspect -f '{{.State.Running}}' "$SPICE_NAME" 2>/dev/null)" = "true" ] \
+   && docker volume inspect "$SPICE_CLIENT_VOLUME" >/dev/null 2>&1 \
+   && [ -s "$SPICE_TOKEN_FILE" ]; then
+  net_args=(--network "$SPICE_NETWORK")
+  mounts+=(-v "$SPICE_CLIENT_VOLUME:/opt/spice:ro")
+  env_args+=(-e "SPICE_URL=http://$SPICE_NAME:$SPICE_PORT")
+  env_args+=(-e "SPICE_STREAM_PORT=$SPICE_STREAM_PORT")
+  env_args+=(-e "SPICE_TOKEN=$(cat "$SPICE_TOKEN_FILE")")
+
+  # heighliner runs its own dnsmasq so *.lvh.me resolves to its nginx proxy.
+  # Pointing at it lets the agent curl the app it just booted. It forwards
+  # everything else upstream, so general DNS still works.
+  hl_dns="$(docker inspect -f "{{.NetworkSettings.Networks.$SPICE_NETWORK.IPAddress}}" heighliner-dns 2>/dev/null || true)"
+  [ -n "$hl_dns" ] && dns_args=(--dns "$hl_dns" "${dns_args[@]+"${dns_args[@]}"}")
+fi
+
 exec docker run --pull=always --rm $TTY_FLAGS \
   --user "$(id -u):$(id -g)" \
   --hostname pi-agent \
   "${mounts[@]}" \
+  ${net_args[@]+"${net_args[@]}"} \
   ${dns_args[@]+"${dns_args[@]}"} \
   ${env_args[@]+"${env_args[@]}"} \
   "$IMAGE" \
   bash -lc '
+    # Spice publishes a stand-in heighliner here when a spice server is up.
+    [ -d /opt/spice/client ] && export PATH="/opt/spice/client:$PATH"
+
     pi_args=(--session-dir "$PWD/.pi-sessions")
     # Auto-trust the project dir: pa is always launched deliberately in the cwd
     # you want to work in, and the container is disposable, so the interactive
     # trust prompt is pure friction. Opt out by passing --no-approve after "pa".
     pi_args+=(--approve)
     [ -d /opt/pa/skills ] && pi_args+=(--skill /opt/pa/skills)
+    # Shipped by spice, so the agent knows heighliner is available and that the
+    # absent docker socket is deliberate.
+    [ -d /opt/spice/skills ] && pi_args+=(--skill /opt/spice/skills)
     for ext in /opt/pa/extensions/*/; do
       [ -f "${ext}index.ts" ] && pi_args+=(-e "${ext%/}")
     done
