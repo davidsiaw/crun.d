@@ -24,6 +24,27 @@ fi
 MISE_VOLUME="${MISE_VOLUME:-pi-sandbox-mise}"
 PI_HOME="$HOME/.pi"
 
+# --sudo: give the agent root inside the container for THIS run only.
+#
+# By default the container runs with --security-opt no-new-privileges, which
+# makes the kernel ignore the setuid bit on /usr/bin/sudo. sudo then fails with
+# a clear message and cannot be re-enabled from inside, no matter what the agent
+# edits -- unlike a sudoers or group scheme, which would be reachable through the
+# deliberately world-writable /etc/passwd.
+#
+# Installing packages does NOT need this: the image ships `pa-apt`, which
+# installs Debian packages into ~/.local/pa-apt without root. Reach for --sudo
+# only when something genuinely needs system integration.
+#
+# Matched only as the FIRST argument, and consumed before the rest is handed to
+# pi. Scanning every argument would eat the string out of a prompt like
+#   pa "why does --sudo exist?"
+PA_SUDO=0
+if [ "${1:-}" = "--sudo" ]; then
+  PA_SUDO=1
+  shift
+fi
+
 docker volume inspect "$MISE_VOLUME" >/dev/null 2>&1 || docker volume create "$MISE_VOLUME" >/dev/null
 
 mkdir -p "$PI_HOME/agent/skills" "$PI_HOME/agent/extensions"
@@ -101,18 +122,47 @@ if [ -f "$PI_HOME/agent/pa.openv" ] && command -v op >/dev/null 2>&1; then
   done < "$PI_HOME/agent/pa.openv"
 fi
 
-# Tailscale MagicDNS resolver — lets the container resolve tailnet hostnames
-# (e.g. my-mac.tail12345.ts.net) so local models on 127.0.0.1 are reachable.
-# Only applies when Tailscale is running; harmless otherwise.
-dns_args=()
-if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
-  dns_args=(--dns 100.100.100.100)
+# Tailnet hostnames — lets the container resolve e.g. my-mac.tail12345.ts.net
+# so local models on 127.0.0.1 are reachable. Only applies when Tailscale is
+# running; harmless otherwise.
+#
+# This used to be `--dns 100.100.100.100`, which was wrong twice over:
+#   * --dns REPLACES the container's resolvers rather than adding to them, and
+#   * quad100 is a tailnet-local address served by tailscaled. Whether it is
+#     reachable from a container netns depends entirely on the host (on Docker
+#     Desktop the Linux VM has no tailscale route at all).
+# So on a Tailscale host, EVERY lookup in the container failed, not just tailnet
+# ones — which is what the entrypoint's sudo-powered resolv.conf "fallback" was
+# papering over, until no-new-privileges took sudo away.
+#
+# MagicDNS is just a name -> 100.x mapping, so resolve it HERE, on the host,
+# where tailscale demonstrably works, and hand docker the answers as static
+# /etc/hosts entries. The container's DNS is left at docker's default, which is
+# never broken, and nothing has to be patched at startup.
+host_args=()
+if command -v tailscale >/dev/null 2>&1 && ts_status="$(tailscale status 2>/dev/null)"; then
+  # Top-level scalar in `tailscale status --json`, e.g. "tail12345.ts.net".
+  ts_suffix="$(tailscale status --json 2>/dev/null \
+    | sed -n 's/.*"MagicDNSSuffix"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [ -n "$ts_suffix" ]; then
+    # `tailscale status` columns: <100.x ip> <hostname> <owner> <os> <state>.
+    # The IP filter also drops the header/health-check lines.
+    while read -r ts_ip ts_host _; do
+      case "$ts_ip" in 100.*) ;; *) continue ;; esac
+      [ -n "$ts_host" ] || continue
+      host_args+=(--add-host "$ts_host.$ts_suffix:$ts_ip")
+    done <<< "$ts_status"
+  fi
 fi
 
 # Spice — lets the agent run heighliner even though this container has no docker
 # socket. Only wires up when a spice server is actually running; otherwise pa
 # behaves exactly as it did before.
 net_args=()
+dns_args=()
+# Second DNS forwarder, used only when the heighliner resolver below is wired
+# up. Override if your network blocks it.
+PA_FALLBACK_DNS="${PA_FALLBACK_DNS:-1.1.1.1}"
 SPICE_NAME="${SPICE_NAME:-heighliner-spice}"
 SPICE_PORT="${SPICE_PORT:-7529}"
 SPICE_STREAM_PORT="${SPICE_STREAM_PORT:-7530}"
@@ -141,13 +191,51 @@ if [ "$(docker inspect -f '{{.State.Running}}' "$SPICE_NAME" 2>/dev/null)" = "tr
   env_args+=(-e "SPICE_STREAM_PORT=$SPICE_STREAM_PORT")
   env_args+=(-e "SPICE_TOKEN=$(cat "$SPICE_TOKEN_FILE")")
 
-  # heighliner runs its own dnsmasq so *.lvh.me resolves to its nginx proxy.
-  # Pointing at it lets the agent curl the app it just booted. It forwards
-  # everything else upstream, so general DNS still works.
+  # heighliner runs its own dnsmasq so <env>.<suffix> resolves to its nginx
+  # proxy, which is how the agent curls the app it just booted. The suffix is
+  # server config and the env name only exists after `heighliner init`, so a
+  # wildcard resolver is the only thing that can answer this -- unlike the
+  # tailnet names above, it cannot be flattened into --add-host entries.
+  #
+  # The resolver's container name comes from the same labels as the network, for
+  # the same reason: a kaiser-era config names it kaiser-dns.
+  #
+  # It is not always up, hence two guards:
+  #
+  # 1. Running AND a syntactically valid IPv4. `docker inspect -f` prints an
+  #    empty string for a stopped container, and the literal "<no value>" when
+  #    the network key is absent entirely -- and `docker run --dns "<no value>"`
+  #    dies with "invalid argument" before the agent ever starts. Checking the
+  #    shape of the answer is the only thing that catches both.
+  #
+  # 2. A public resolver as a SECOND forwarder, because --dns replaces the
+  #    forwarder list outright: a dnsmasq that dies mid-session would otherwise
+  #    take all external name resolution down with it, which is exactly the
+  #    failure mode the tailscale change above was about. Reaching spice by
+  #    container name is unaffected either way -- on a user-defined network
+  #    docker's embedded resolver at 127.0.0.11 answers container names itself
+  #    and only forwards what it cannot answer.
   hl_dns_name="$(spice_label dns)"
   hl_dns_name="${hl_dns_name:-heighliner-dns}"
-  hl_dns="$(docker inspect -f "{{.NetworkSettings.Networks.$SPICE_NETWORK.IPAddress}}" "$hl_dns_name" 2>/dev/null || true)"
-  [ -n "$hl_dns" ] && dns_args=(--dns "$hl_dns" "${dns_args[@]+"${dns_args[@]}"}")
+  if [ "$(docker inspect -f '{{.State.Running}}' "$hl_dns_name" 2>/dev/null)" = "true" ]; then
+    hl_dns="$(docker inspect -f "{{.NetworkSettings.Networks.$SPICE_NETWORK.IPAddress}}" "$hl_dns_name" 2>/dev/null || true)"
+    if [[ "$hl_dns" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+      dns_args=(--dns "$hl_dns" --dns "$PA_FALLBACK_DNS")
+    else
+      echo "pa: warning: $hl_dns_name is up but has no IPv4 on $SPICE_NETWORK; using default DNS" >&2
+    fi
+  fi
+fi
+
+sec_args=(--security-opt no-new-privileges)
+if [ "$PA_SUDO" = "1" ]; then
+  sec_args=()
+  # Warn on the HOST terminal: root in the container is also root over the
+  # bind-mounted project directory, which is the part that outlives the run.
+  printf '\033[33m%s\033[0m\n' \
+    "pa: --sudo given: the agent has ROOT in the container, including over $PWD" >&2
+  # Let the sandbox tell the agent it holds root this session.
+  env_args+=(-e PA_SUDO=1)
 fi
 
 # --pull=missing, not never: the first run on a new machine has no image to reuse,
@@ -155,8 +243,10 @@ fi
 exec docker run --pull=missing --rm $TTY_FLAGS \
   --user "$(id -u):$(id -g)" \
   --hostname pi-agent \
+  ${sec_args[@]+"${sec_args[@]}"} \
   "${mounts[@]}" \
   ${net_args[@]+"${net_args[@]}"} \
+  ${host_args[@]+"${host_args[@]}"} \
   ${dns_args[@]+"${dns_args[@]}"} \
   ${env_args[@]+"${env_args[@]}"} \
   "$IMAGE" \
