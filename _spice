@@ -1,0 +1,25 @@
+#!/bin/bash
+# _spice - ask the spice image what heighliner calls things.
+#
+# Prints SPICE_HL_* shell assignments to eval:
+#
+#   eval "$(_spice)"
+#   echo "$SPICE_HL_NETWORK $SPICE_HL_DNS $SPICE_HL_CONFIG_DIR"
+#
+# The names are heighliner's, not spice's, and heighliner used to be called
+# kaiser: it still uses ~/.kaiser when that is the only config dir present, and a
+# kaiser-era config.yml says kaiser_net and kaiser-dns. Rather than teach these
+# scripts that history, the question is asked of the heighliner gem inside the
+# image -- the same way rb and be leave the real work to cmdgen.rb.
+#
+# $HOME is mounted at its real path because the answer depends on which config
+# dir is there. Read-only: this only reads config.
+set -euo pipefail
+
+IMAGE="${SPICE_IMAGE:-davidsiaw/heighliner-spice:latest}"
+
+exec docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$HOME:$HOME:ro" \
+  -e "HOME=$HOME" \
+  "$IMAGE" ruby /app/spice/settings.rb

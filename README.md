@@ -34,7 +34,18 @@ Commands
 - `rc` run cargo
 
 ### pi agent
-- `pa` run the pi coding agent in a throwaway sandbox container
+- `pa` run the pi coding agent in a throwaway sandbox container. It reuses the
+  image you already have: it is several gigabytes, and a registry round-trip
+  before every session buys nothing most of the time
+- `pa update` pull a newer sandbox image. This is how you update pi: pi is baked
+  into the image, so its own `update` would upgrade something the container
+  throws away on exit
+- `sp` run the spice server, so a sandboxed agent can use heighliner
+- `sp update` pull a newer spice image and restart the server onto it
+- `_spice` ask the spice image what heighliner calls its config dir, network and
+  containers. Like `cmdgen.rb`, it exists so `sp` and `pa` stay short: the names
+  differ on an install predating the heighliner/kaiser rename, and the answer
+  comes from heighliner itself rather than from these scripts
 
 `pa` is different from the others: it runs the prebuilt `davidsiaw/pi-sandbox`
 image (pulled from Docker Hub, built separately) rather than a stock language
