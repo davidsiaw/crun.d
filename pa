@@ -155,6 +155,53 @@ if command -v tailscale >/dev/null 2>&1 && ts_status="$(tailscale status 2>/dev/
   fi
 fi
 
+# Extra names to pin, space- or comma-separated:
+#
+#   PA_ADD_HOST="gpu.corp.example db.corp.example"
+#   PA_ADD_HOST="gpu.corp.example:100.64.0.9"      # explicit, no lookup
+#
+# For a name the HOST resolves but the container does not. The snapshot above
+# cannot cover it: it only knows peers listed in `tailscale status`, and a name
+# served by a tailnet nameserver (split DNS / a restricted nameserver) or by any
+# other VPN-internal zone is not a peer and does not appear there.
+#
+# Normally that is fine -- the container inherits the host's resolvers and finds
+# it anyway. It stops being fine the moment the heighliner branch below passes
+# --dns, because --dns REPLACES the resolver list: every lookup then goes to
+# heighliner's dnsmasq (and PA_FALLBACK_DNS), neither of which knows an internal
+# name, and a resolver that answers NXDOMAIN ends the search rather than falling
+# through to the next one.
+#
+# Same trick as the snapshot, then: resolve on the host, where it demonstrably
+# works, and hand docker the answer. --add-host writes /etc/hosts, which glibc
+# consults BEFORE dns ("hosts: files dns"), so the pin holds whatever --dns ends
+# up being.
+pa_resolve() {
+  if command -v getent >/dev/null 2>&1; then            # Linux
+    getent ahostsv4 "$1" 2>/dev/null | awk 'NR==1 {print $1}'
+  elif command -v dscacheutil >/dev/null 2>&1; then     # macOS
+    dscacheutil -q host -a name "$1" 2>/dev/null \
+      | awk '/^ip_address: /{print $2; exit}'
+  fi
+}
+
+pa_add_host="${PA_ADD_HOST:-}"
+for pa_spec in ${pa_add_host//,/ }; do
+  # name:ip is passed straight through -- an escape hatch for when the host's
+  # own lookup tool disagrees with the resolver you care about.
+  case "$pa_spec" in
+    *:*) host_args+=(--add-host "$pa_spec"); continue ;;
+  esac
+  # `|| true`: a name that does not resolve makes the lookup pipeline fail, and
+  # under `set -o pipefail` that would take the whole launcher down.
+  pa_ip="$(pa_resolve "$pa_spec" || true)"
+  if [ -n "$pa_ip" ]; then
+    host_args+=(--add-host "$pa_spec:$pa_ip")
+  else
+    echo "pa: warning: could not resolve $pa_spec on the host; not pinned" >&2
+  fi
+done
+
 # Spice — lets the agent run heighliner even though this container has no docker
 # socket. Only wires up when a spice server is actually running; otherwise pa
 # behaves exactly as it did before.
