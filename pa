@@ -61,6 +61,65 @@ mounts=(
   -v "$PI_HOME/agent/extensions:/home/agent/.pi/agent/extensions"
 )
 
+# PA_PACKAGES / ~/.pi/agent/pa.packages -- private pi packages loaded from disk.
+#
+# A private package cannot be installed the normal way in here. `packages` in
+# settings.json with git:git@github.com:org/repo makes pi clone the repo at
+# startup, and the sandbox has no ssh keys and no agent socket, deliberately --
+# so that entry fails, and it should: cloning is the wrong move for a container
+# that is thrown away on exit. To work ON such a package, run `pa` inside its
+# checkout like any other project.
+#
+# To work WITH one, hand pa the checkout you already have. Each entry is bind
+# mounted read-only at /opt/pa/local-packages/<name> and passed to pi as
+# `-e <dir>`. pi's local package source runs through the same resolver as an
+# installed package, so the dir's extensions AND skills (AND prompts AND themes)
+# all load, honouring the "pi" key in its package.json or the conventional
+# extensions/ + skills/ directories. No network, no credentials, and nothing has
+# to be copied into ~/.pi/agent, which stays as clean as it was.
+#
+# Read-only is the point: the host checkout is yours, not the agent's. One
+# consequence -- pi does not npm-install local sources (upstream behaviour, not
+# ours), so a package with real runtime dependencies needs its node_modules
+# present on the HOST.
+#
+#   PA_PACKAGES=~/work/data-eng-pi-ext:~/work/other-ext pa
+#
+# or permanently, one path per line in ~/.pi/agent/pa.packages.
+# Colons separate, like PATH; commas too, like PA_ADD_HOST. A path containing
+# either character cannot be passed this way -- use pa.packages for that. Split
+# by tr + read rather than word splitting, so a path with spaces survives.
+pa_pkg_srcs=()
+while IFS= read -r pa_pkg_line; do
+  [ -n "$pa_pkg_line" ] && pa_pkg_srcs+=("$pa_pkg_line")
+done <<< "$(printf '%s' "${PA_PACKAGES:-}" | tr ':,' '\n\n')"
+
+if [ -f "$PI_HOME/agent/pa.packages" ]; then
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    pa_pkg_srcs+=("$line")
+  done < "$PI_HOME/agent/pa.packages"
+fi
+
+# Container-side dirs, newline-joined and handed to the inner shell as an env
+# var, because the launcher's array cannot cross the docker boundary.
+pa_pkg_dsts=""
+pa_pkg_n=0
+for pa_pkg_src in ${pa_pkg_srcs[@]+"${pa_pkg_srcs[@]}"}; do
+  pa_pkg_src="${pa_pkg_src/#\~/$HOME}"
+  if [ ! -d "$pa_pkg_src" ]; then
+    echo "pa: warning: not a directory, skipping: $pa_pkg_src" >&2
+    continue
+  fi
+  # Suffix every mount point with an index: two checkouts can share a basename
+  # (a fork and its upstream), and a silently shadowed package is worse than an
+  # ugly path. pi reports the mount path in its resource list either way.
+  pa_pkg_dst="/opt/pa/local-packages/$(basename "$pa_pkg_src")-$pa_pkg_n"
+  mounts+=(-v "$pa_pkg_src:$pa_pkg_dst:ro")
+  pa_pkg_dsts="${pa_pkg_dsts}${pa_pkg_dst}"$'\n'
+  pa_pkg_n=$((pa_pkg_n + 1))
+done
+
 mkdir -p "$PI_HOME/agent/auth2api"
 mounts+=(-v "$PI_HOME/agent/auth2api:/home/agent/.pi/agent/auth2api")
 
@@ -96,6 +155,10 @@ if [ -f "$PI_HOME/agent/APPEND_SYSTEM.md" ]; then
 fi
 
 env_args=()
+
+if [ -n "$pa_pkg_dsts" ]; then
+  env_args+=(-e "PA_LOCAL_PACKAGES=$pa_pkg_dsts")
+fi
 
 if [ -f "$PI_HOME/agent/pa.env" ]; then
   while IFS= read -r line; do
@@ -313,5 +376,10 @@ exec docker run --pull=missing --rm $TTY_FLAGS \
     for ext in /opt/pa/extensions/*/; do
       [ -f "${ext}index.ts" ] && pi_args+=(-e "${ext%/}")
     done
+    # Read-only mounts of host package checkouts (PA_PACKAGES). One -e per dir
+    # loads its extensions and skills both.
+    while IFS= read -r pkg; do
+      [ -n "$pkg" ] && pi_args+=(-e "$pkg")
+    done <<< "${PA_LOCAL_PACKAGES:-}"
     exec pi "${pi_args[@]}" "$@"
   ' -- "$@"

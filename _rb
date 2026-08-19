@@ -19,4 +19,5 @@ docker run --rm $TTY_FLAGS \
 	-e USR=`id -un` \
 	-e NOCACHE="$NOCACHE" \
 	-e NOUSERDEF="$NOUSERDEF" \
+	-e CRUN_TTY="$CRUN_TTY" \
 	ruby ruby "$@"

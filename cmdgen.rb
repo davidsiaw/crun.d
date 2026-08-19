@@ -12,7 +12,7 @@ def puts(str)
 end
 
 basecmd="docker run"
-tty_flag = "-i"  # always pass stdin through
+tty_flag = ENV["CRUN_TTY"] == "1" ? "-it" : "-i"  # -i always: pass stdin through
 flags = "--rm #{tty_flag}"
 curdir=%{-v #{pwd}:#{pwd} --workdir=#{pwd}}
 userspec="-u #{uid}:#{gid}"

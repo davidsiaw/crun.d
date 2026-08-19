@@ -139,6 +139,16 @@ files (`AGENTS.md`, `CLAUDE.md`, `SYSTEM.md`, `APPEND_SYSTEM.md`).
 The image can also ship its own skills and extensions (baked at `/opt/pa`),
 loaded on top of your host ones. Those live in the image repo, not here.
 
+Private pi packages come from disk instead of from git, because the sandbox has
+no ssh keys (a `git:git@github.com:...` entry in `packages` fails, and should:
+cloning into a container that is deleted on exit is pointless). List host
+checkouts in `PA_PACKAGES` (`:`- or `,`-separated) or one per line in
+`~/.pi/agent/pa.packages`; each is mounted **read-only** at
+`/opt/pa/local-packages/<name>-<n>` and loaded with `pi -e`, which picks up that
+package's extensions *and* skills in one flag. Nothing is copied into
+`~/.pi/agent`, so your pi home stays clean. To edit such a package, run `pa`
+inside its checkout.
+
 pi sessions are written to a `.pi-sessions/` folder inside the current project
 (created by `pa`, passed via `--session-dir`), so they persist on the host and
 stay with the project rather than in the throwaway container home.
@@ -165,3 +175,5 @@ Environment Variables
 - `NO_MOUNT_SYSTEM=1` - don't mount a host `SYSTEM.md` (which would replace pi's
   system prompt)
 - `MISE_VOLUME` - name of the runtime cache volume (default `pi-sandbox-mise`)
+- `PA_PACKAGES` - host pi-package checkouts to mount read-only and load for this
+  run, e.g. `PA_PACKAGES=~/work/private-pi-ext pa`

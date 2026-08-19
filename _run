@@ -4,6 +4,13 @@
 
 a=`uuidgen | tr -d '-'`
 
+# cmdgen.rb's stdout is redirected into .cmdsh$a, so it cannot detect a tty
+# itself. Decide here and pass it in. Only the piped-stdin case is forced off:
+# docker refuses -t when stdin is a file ("the input device is not a TTY").
+CRUN_TTY=0
+[ -t 0 ] && [ -t 1 ] && CRUN_TTY=1
+export CRUN_TTY
+
 if [ -t 0 ]; then
   _rb $CRUN_PATH/cmdgen.rb "$@" > .cmdsh$a
   bash .cmdsh$a
